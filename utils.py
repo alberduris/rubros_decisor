@@ -17,7 +17,7 @@ def similarity_search_threshold(db, query, threshold, max):
 
 ## PROMPTS ##
 
-def detect_entities(text):
+def detect_entities(text, model):
     system_prompt = """Eres un detector de entidades. 
 
 Contexto: Tu tarea es detectar PRODUCTOS, SERVICIOS Y PROFESIONES en un texto dado. Debes copiar literalmente cada PRODUCTO, SERVICIO Y PROFESIÓN tal y como aparece en el mensaje original.
@@ -26,7 +26,7 @@ Instrucciones: Tu respuesta debe ser una lista de strings tal que "["<PRODUCTO1>
 
 Tarea: Lee el texto, extrae cada PRODUCTO, SERVICIO y PROFESIÓN y crea una lista en formato JSON."""
     # Call to OpenAI completion endpoint with GPT and system_prompt
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[
+    response = openai.ChatCompletion.create(model=model, messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": text}
     ],
@@ -34,7 +34,7 @@ Tarea: Lee el texto, extrae cada PRODUCTO, SERVICIO y PROFESIÓN y crea una list
     return json.loads(response.choices[0].message.content)
 
 
-def unspecificity_detector(text, rubros):
+def unspecificity_detector(text, rubros, model):
     system_prompt = """Eres un abogado experto en el registro de marcas comerciales. Las marcas se clasifican en base al rubro al cual se dedican. 
 
 A partir de ahora debes actuar como un clasificador de texto multi-clase. 
@@ -76,16 +76,18 @@ La respuesta será SIEMPRE en formato JSON válido siguendo SCHEMA.
 PosiblesRubros: {rubros}"""
 
     # Call to OpenAI completion endpoint with GPT and system_prompt
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[
+    response = openai.ChatCompletion.create(model=model, messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt}
     ],
         temperature=0,)
-    # TODO: Add checking for valid JSON and if it's not valid then return an empty response
-    return json.loads(response.choices[0].message.content)
+    try:
+        return json.loads(response.choices[0].message.content)
+    except:
+        print("unspecificity_detector > No JSON object could be decoded, returning as string")
+        return response.choices[0].message.content
 
-
-def rubro_decisor(text, rubros):
+def rubro_decisor(text, rubros, model):
     system_prompt = """Eres un abogado experto en el registro de marcas comerciales. Las marcas se clasifican en base al rubro (categoría, conjunto de artículos de consumo de un mismo tipo o relacionados con determinada actividad) al cual se dedican. 
 
 A partir de ahora debes actuar como un clasificador de texto multi-etiqueta. 
@@ -94,34 +96,43 @@ Recibirás un texto libre identificado por "TextoCliente" y una serie de rubros 
 
 Clasificador: Tu tarea consiste en etiquetar el "TextoCliente" con los rubros que le corresponden de la lista "PosiblesRubros". Es posible que no corresponda ningún rubro. Además, como abogado experto, debes devoler el razonamiento asociado a la selección o descarte de cada rubro.
 
+"rubro": el rubro que estás evaluando
+"razonamiento": <texto libre>
+"decision": "Sí" / "No" / "Quizás" (la decisión viene condicionada por tu razonamiento)
+
 SCHEMA:
-{
-    ["textocliente": "<textocliente>", "rubro": "<rubro>", "razonamiento": "<razonamiento>", "decision": "<decision>"],
+[
+    {"textocliente": <textocliente>, "rubro": <rubro>, "razonamiento": <razonamiento>, "decision": <decision>},
     ...
-}
+]
 
 Instrucción PENSAMIENTO: Basa toda tu respuesta en el "TextoCliente".
-Instrucción PENSAMIENTO: Cuando en el razonamiento haya suposiciones, hipótesis o conjeturas (sugiere, puede, quizás, es posible, tal vez, probablemente, posiblemente, seguramente, podría ser...), debes justificar tu respuesta.
+Instrucción PENSAMIENTO: En el razonamiento evita suposiciones, hipótesis o conjeturas (sugiere, puede, quizás, es posible, tal vez, probablemente, posiblemente, seguramente, podría ser...). Si no estás seguro, la decisión debe ser "No".
+Instrucción PENSAMIENTO: Cuando en el razonamiento haya suposiciones, hipótesis o conjeturas (sugiere, puede, quizás, es posible, tal vez, probablemente, posiblemente, seguramente, podría ser...), aplica el pensamiento crítico (observa, analiza, evalúa, infiere, interpreta y sé crítico contigo mismo).
 Instrucción PENSAMIENTO: Si el razonamiento se basa en suposiciones, hipótesis o conjeturas (sugiere, puede, quizás, es posible, tal vez, probablemente, posiblemente, seguramente, podría ser...), la decisión debe ser "No".
 Instrucción PENSAMIENTO: El error "falso positivo" es más grave que el "falso negativo".
 
 Instrucción RESPUESTA:  Si ningún rubro es adecuado, debes devolver una lista vacía.
-Instrucción RESPUESTA: Responde con formato JSON válido siguiendo SCHEMA."""
+Instrucción RESPUESTA: La respuesta será SIEMPRE en formato LISTA JSON válida siguendo SCHEMA."""
 
     user_prompt = f"""TextoCliente: "{text}"
 PosiblesRubros: {rubros}"""
 
     # Call to OpenAI completion endpoint with GPT and system_prompt
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[
+    response = openai.ChatCompletion.create(model=model, messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt}
     ],
         temperature=0)
-    # TODO: Add checking for valid JSON and if it's not valid then return an empty response
-    return response.choices[0].message.content
+    try:
+        return json.loads(response.choices[0].message.content)
+
+    except:
+        print("rubro_decisor > No JSON object could be decoded, returning as string")
+        return response.choices[0].message.content
 
 
-def unspecificity_explainer(text):
+def unspecificity_explainer(text, model):
     # Not implemented yet
     system_prompt = """Eres un abogado experto en el registro de marcas comerciales. Las marcas se clasifican en base al rubro al cual se dedican. 
 
@@ -144,10 +155,13 @@ justificacion: "<tu justificación>"}
 Instrucción: La respuesta será SIEMPRE en formato JSON válido siguendo SCHEMA."""
 
     # Call to OpenAI completion endpoint with GPT and system_prompt
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[
+    response = openai.ChatCompletion.create(model=model, messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": text}
     ],
         temperature=0)
-    # TODO: Add checking for valid JSON and if it's not valid then return an empty response
-    return json.loads(response.choices[0].message.content)
+    try:
+        return json.loads(response.choices[0].message.content)
+    except:
+        print("unspecificity_explainer > No JSON object could be decoded, returning as string")
+        return response.choices[0].message.content

@@ -15,45 +15,108 @@ import openai
 import json
 from utils import detect_entities, similarity_search_threshold, unspecificity_detector, rubro_decisor, unspecificity_explainer
 
-openai.api_key = "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"
+
+st.sidebar.header('API Key Configuration')
+with st.sidebar:
+    api_key = st.text_input('OpenAI API key')
+    model = st.selectbox('Model', ['gpt-3.5-turbo', 'gpt-4'])
 
 
-db = {}
-for set in ['all', 'curated']:
-    # Load the FAISS DB
-    pass
-    db[set] = FAISS.load_local(
-        f"indexes/{set}_rubros_index", OpenAIEmbeddings(openai_api_key=openai.api_key))
+st.title('Parte 1')
+st.header('Detector de inespecificidades y rubros')
 
-st.title('Rubro Decider App')
 
-client_text = st.text_input(
-    'Enter a client\'s text:', 'Marca de decoración hecha a mano')
+if api_key == '':
+    st.warning('No se ha configurado una API key de OpenAI')
 
-if st.button('Submit'):
-    entities = detect_entities(client_text)
-    rubros = pd.Series()
-    for ent in entities:
-        rubros = pd.concat([rubros, similarity_search_threshold(
-            db['curated'], ent, 0.3, 25)['page_content']])
-    if rubros.empty:
-        rubros = pd.Series(similarity_search_threshold(
-            db['all'], client_text, 0.3, 25)['page_content'])
-    rubros = list(rubros.values)
+else:
+    openai.api_key = api_key
+    db = {}
+    for set in ['all', 'curated']:
+        # Load the FAISS DB
+        pass
+        db[set] = FAISS.load_local(
+            f"indexes/{set}_rubros_index", OpenAIEmbeddings(openai_api_key=openai.api_key))
 
-    nl = '\n- '
-    st.write(f"El texto provisto por el cliente es: '{client_text}'\n")
-    st.write(f"Las entidades detectadas son: {nl}{nl.join(entities)}\n")
-    st.write(f"Los rubros detectados son: {nl}{nl.join(rubros)}\n")
+    client_text = st.text_input(
+        'Texto del cliente:', '', placeholder='Marca de decoración hecha a mano')
 
-    if len(rubros) == 0:
-        unspecificity_explainer(client_text)
-        st.write(unspecificity_explainer)
+    if st.button('Submit'):
+        with st.spinner('Detectando entidades y extrayendo rubros relacionados...'):
+            entities = detect_entities(client_text, model)
+            rubros = pd.Series(dtype='object')
+            for ent in entities:
+                rubros = pd.concat([rubros, similarity_search_threshold(
+                    db['curated'], ent, 0.3, 25)['page_content']])
+            if rubros.empty:
+                rubros = pd.Series(similarity_search_threshold(
+                    db['all'], client_text, 0.3, 25)['page_content'])
+            rubros = list(rubros.values)
 
-    if len(rubros) > 0:
-        unespecificResponse = unspecificity_detector(client_text, rubros)
-        st.write(unespecificResponse)
+        col1, col2 = st.columns(2)
+        nl = '\n- '
+        with col1:
+            st.markdown(f"**Las entidades detectadas son:**")
+            with st.expander("Ver entidades"):
+                st.write(f"{nl}{nl.join(entities)}\n")
+                st.write("\n")
+        with col2:
+            st.markdown(f"**Los posibles rublos relacionados son:**")
+            with st.expander("Ver rubros"):
+                st.write(f"{nl}{nl.join(rubros)}\n")
+                st.write("\n")
 
-    if len(rubros) > 0:
-        rubrosResponse = rubro_decisor(client_text, rubros)
-        st.write(rubrosResponse)
+        if len(rubros) > 0:
+            with st.spinner('Detectando inespecificidades...'):
+                unespecificResponse = unspecificity_detector(
+                    client_text, rubros, model)
+
+            st.markdown(f"**Inespecificidad:**")
+            try:
+                st.json(unespecificResponse)
+            except:
+                st.write(unespecificResponse)
+
+            with st.spinner("Decidiendo rubros..."):
+                rubrosResponse = rubro_decisor(client_text, rubros, model)
+
+            st.markdown(f"**Rubros:**")
+
+            # If rubrosResponse is JSON object
+            if isinstance(rubrosResponse, list):
+                accepted_rubros = list(
+                    filter(lambda x: x["decision"] == 'Sí', rubrosResponse))
+                maybe_rubros = list(
+                    filter(lambda x: x["decision"] == 'Quizás', rubrosResponse))
+                rejected_rubros = list(
+                    filter(lambda x: x["decision"] == 'No', rubrosResponse))
+
+
+                if len(accepted_rubros) == 0:
+                    st.warning("No se encontraron rubros aceptados")
+                    # Show rejected rubros
+                    if len(rejected_rubros) > 0:
+                        st.markdown("**Rubros rechazados**")
+                        for rubro in rejected_rubros:
+                            with st.expander(rubro["rubro"]):
+                                st.error(rubro["razonamiento"])
+                else:
+                    st.markdown("**Rubros aceptados**")
+                    for rubro in accepted_rubros:
+                        with st.expander(rubro["rubro"]):
+                            st.info(rubro["razonamiento"])
+                if len(maybe_rubros) > 0:
+                    st.markdown("**Rubros en duda**")
+                    for rubro in maybe_rubros:
+                        with st.expander(rubro["rubro"]):
+                            st.warning(rubro["razonamiento"].replace("TextoCliente", "texto del cliente"))
+            else:
+                try:
+                    print(rubrosResponse)
+                    st.json(rubrosResponse)
+                except:
+                    st.write(rubrosResponse)
+
+        if len(rubros) == 0:
+            unspecificity_explainer(client_text, model)
+
