@@ -41,10 +41,10 @@ else:
     client_text = st.text_input(
         'Texto del cliente:', '', placeholder='Marca de decoración hecha a mano')
 
-    if st.button('Submit'):
+    if st.button('Enviar'):
+        st.markdown("### Extracción de entidades y búsqueda semántica")
         with st.spinner('Detectando entidades y extrayendo rubros relacionados...'):
             entities = detect_entities(client_text, model)
-            entities = "lalalala nononono"
             rubros = pd.Series(dtype='object')
             # Check if entities is a list
             if not isinstance(entities, list) or len(entities) == 0:
@@ -81,16 +81,16 @@ else:
                 unespecificResponse = unspecificity_detector(
                     client_text, rubros, model)
 
-            st.markdown(f"**Inespecificidad:**")
+            st.markdown("### Inespecificidad")
             try:
                 st.json(unespecificResponse)
             except:
                 st.write(unespecificResponse)
 
+            st.markdown(f"### Rubros")
             with st.spinner("Evaluando rubros..."):
                 rubrosResponse = rubro_decisor(client_text, rubros, model)
 
-            st.markdown(f"**Rubros:**")
 
             # If rubrosResponse is JSON object
             if isinstance(rubrosResponse, list):
@@ -131,7 +131,7 @@ else:
             with st.spinner("Extrayendo razones de inespecificidad..."):
                 unspecificExplanation = unspecificity_explainer(
                     client_text, model)
-                st.markdown(f"**Inespecificidad:**")
+                st.markdown("### Inespecificidad")
                 try:
                     st.json(unspecificExplanation)
                 except:
