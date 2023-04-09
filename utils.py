@@ -18,20 +18,30 @@ def similarity_search_threshold(db, query, threshold, max):
 ## PROMPTS ##
 
 def detect_entities(text, model):
-    system_prompt = """Eres un detector de entidades. 
+    system_prompt = """Eres un detector de entidades (Named Entity Recognition system). 
 
-Contexto: Tu tarea es detectar PRODUCTOS, SERVICIOS Y PROFESIONES en un texto dado. Debes copiar literalmente cada PRODUCTO, SERVICIO Y PROFESIÓN tal y como aparece en el mensaje original.
+Contexto: Como NER, tu tarea es detectar PRODUCTOS, SERVICIOS Y PROFESIONES en un texto dado. Debes copiar literalmente cada PRODUCTO, SERVICIO Y PROFESIÓN tal y como aparece en el mensaje original.
 
-Instrucciones: Tu respuesta debe ser una lista de strings tal que "["<PRODUCTO1>", "<SERVICIO1>", ..., "<PRODUCTON>"].
+Instrucciones: Tu respuesta debe ser SIEMPRE una lista de strings en JSON válido siguiendo el SCHEMA.
 
-Tarea: Lee el texto, extrae cada PRODUCTO, SERVICIO y PROFESIÓN y crea una lista en formato JSON."""
+SCHEMA:
+["<entidad1>", "<entidad2>", ..., "<entidadn>"]
+
+Instrucción: Si no hay ninguna entidad, devuelve una lista vacía ([]).
+
+Tarea: Lee el texto, extrae cada PRODUCTO, SERVICIO y PROFESIÓN y escribe una lista en formato JSON válido siguiendo el SCHEMA."""
     # Call to OpenAI completion endpoint with GPT and system_prompt
     response = openai.ChatCompletion.create(model=model, messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": text}
     ],
         temperature=0,)
-    return json.loads(response.choices[0].message.content)
+    try:
+        return json.loads(response.choices[0].message.content)
+    except:
+        print(
+            "detect_entities > No JSON object could be decoded, returning as string")
+        return response.choices[0].message.content
 
 
 def unspecificity_detector(text, rubros, model):
@@ -84,8 +94,10 @@ PosiblesRubros: {rubros}"""
     try:
         return json.loads(response.choices[0].message.content)
     except:
-        print("unspecificity_detector > No JSON object could be decoded, returning as string")
+        print(
+            "unspecificity_detector > No JSON object could be decoded, returning as string")
         return response.choices[0].message.content
+
 
 def rubro_decisor(text, rubros, model):
     system_prompt = """Eres un abogado experto en el registro de marcas comerciales. Las marcas se clasifican en base al rubro (categoría, conjunto de artículos de consumo de un mismo tipo o relacionados con determinada actividad) al cual se dedican. 
@@ -163,5 +175,6 @@ Instrucción: La respuesta será SIEMPRE en formato JSON válido siguendo SCHEMA
     try:
         return json.loads(response.choices[0].message.content)
     except:
-        print("unspecificity_explainer > No JSON object could be decoded, returning as string")
+        print(
+            "unspecificity_explainer > No JSON object could be decoded, returning as string")
         return response.choices[0].message.content

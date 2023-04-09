@@ -44,13 +44,19 @@ else:
     if st.button('Submit'):
         with st.spinner('Detectando entidades y extrayendo rubros relacionados...'):
             entities = detect_entities(client_text, model)
+            entities = "lalalala nononono"
             rubros = pd.Series(dtype='object')
+            # Check if entities is a list
+            if not isinstance(entities, list) or len(entities) == 0:
+                entities = [client_text]
             for ent in entities:
                 rubros = pd.concat([rubros, similarity_search_threshold(
                     db['curated'], ent, 0.3, 25)['page_content']])
             if rubros.empty:
-                rubros = pd.Series(similarity_search_threshold(
-                    db['all'], client_text, 0.3, 25)['page_content'])
+                for ent in entities:
+                    rubros = pd.Series(similarity_search_threshold(
+                        db['all'], ent, 0.3, 25)['page_content'])
+
             rubros = list(rubros.values)
 
         col1, col2 = st.columns(2)
@@ -61,10 +67,14 @@ else:
                 st.write(f"{nl}{nl.join(entities)}\n")
                 st.write("\n")
         with col2:
+            # Check if rubros is empty
             st.markdown(f"**Los posibles rublos relacionados son:**")
-            with st.expander("Ver rubros"):
-                st.write(f"{nl}{nl.join(rubros)}\n")
-                st.write("\n")
+            if len(rubros) == 0:
+                st.warning("No se encontraron rubros relacionados")
+            else:
+                with st.expander("Ver rubros"):
+                    st.write(f"{nl}{nl.join(rubros)}\n")
+                    st.write("\n")
 
         if len(rubros) > 0:
             with st.spinner('Detectando inespecificidades...'):
@@ -77,7 +87,7 @@ else:
             except:
                 st.write(unespecificResponse)
 
-            with st.spinner("Decidiendo rubros..."):
+            with st.spinner("Evaluando rubros..."):
                 rubrosResponse = rubro_decisor(client_text, rubros, model)
 
             st.markdown(f"**Rubros:**")
@@ -90,7 +100,6 @@ else:
                     filter(lambda x: x["decision"] == 'Quizás', rubrosResponse))
                 rejected_rubros = list(
                     filter(lambda x: x["decision"] == 'No', rubrosResponse))
-
 
                 if len(accepted_rubros) == 0:
                     st.warning("No se encontraron rubros aceptados")
@@ -109,7 +118,8 @@ else:
                     st.markdown("**Rubros en duda**")
                     for rubro in maybe_rubros:
                         with st.expander(rubro["rubro"]):
-                            st.warning(rubro["razonamiento"].replace("TextoCliente", "texto del cliente"))
+                            st.warning(rubro["razonamiento"].replace(
+                                "TextoCliente", "texto del cliente"))
             else:
                 try:
                     print(rubrosResponse)
@@ -118,5 +128,11 @@ else:
                     st.write(rubrosResponse)
 
         if len(rubros) == 0:
-            unspecificity_explainer(client_text, model)
-
+            with st.spinner("Extrayendo razones de inespecificidad..."):
+                unspecificExplanation = unspecificity_explainer(
+                    client_text, model)
+                st.markdown(f"**Inespecificidad:**")
+                try:
+                    st.json(unspecificExplanation)
+                except:
+                    st.write(unspecificExplanation)
