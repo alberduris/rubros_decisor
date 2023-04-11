@@ -103,8 +103,6 @@ else:
             st.markdown(f"### Rubros")
             with st.spinner("Evaluando rubros..."):
                 rubrosResponse = rubro_decisor(client_text, rubros, model)
-                rubrosResponse = "{ asdaa, 'asdas: asdasd .112}"
-
 
             # If rubrosResponse is JSON object
             if isinstance(rubrosResponse, list):
