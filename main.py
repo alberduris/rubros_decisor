@@ -69,7 +69,9 @@ else:
                     rubros = pd.Series(similarity_search_threshold(
                         db['all'], ent, threshold=0.3, max=10)['page_content'])
 
-            rubros = list(rubros.values)
+            # Remove duplicates, sort rubros by score and get first 10 as list
+            rubros = rubros.drop_duplicates().sort_values(
+                ascending=False).head(10).tolist()
 
         col1, col2 = st.columns(2)
         nl = '\n- '
@@ -87,7 +89,6 @@ else:
                 with st.expander("Ver rubros"):
                     st.write(f"{nl}{nl.join(rubros)}\n")
                     st.write("\n")
-
         if len(rubros) > 0:
             with st.spinner('Detectando inespecificidades...'):
                 unespecificResponse = unspecificity_detector(
