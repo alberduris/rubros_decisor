@@ -12,7 +12,13 @@ def similarity_search_threshold(db, query, threshold, max):
     df = pd.DataFrame([(doc.page_content, score)
                       for doc, score in ssws], columns=['page_content', 'score'])
     # Filter by threshold: Get all the rows where the score is less than the threshold and if it's none then return the five first rows
-    return df.head(5) if len(df[df['score'] < threshold]) < 5 else df[df['score'] < threshold]
+    print(df)
+    print(df.describe())
+    df_filtered = df[df['score'] < threshold]
+    if len(df_filtered) < 5:
+        return df.head(5)
+    else:
+        return df_filtered
 
 
 ## PROMPTS ##

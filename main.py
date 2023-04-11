@@ -16,6 +16,7 @@ import json
 import warnings
 from utils import detect_entities, similarity_search_threshold, unspecificity_detector, rubro_decisor, unspecificity_explainer
 
+
 def is_json(myjson):
     # If myJson is a dict return true
     if isinstance(myjson, dict):
@@ -62,11 +63,11 @@ else:
                 entities = [client_text]
             for ent in entities:
                 rubros = pd.concat([rubros, similarity_search_threshold(
-                    db['curated'], ent, 0.3, 25)['page_content']])
+                    db['curated'], ent, threshold=0.3, max=10)['page_content']])
             if rubros.empty:
                 for ent in entities:
                     rubros = pd.Series(similarity_search_threshold(
-                        db['all'], ent, 0.3, 25)['page_content'])
+                        db['all'], ent, threshold=0.3, max=10)['page_content'])
 
             rubros = list(rubros.values)
 
@@ -97,7 +98,8 @@ else:
             if is_json(unespecificResponse):
                 st.json(unespecificResponse)
             else:
-                warnings.warn("No se pudo parsear la respuesta de inespecificidad")
+                warnings.warn(
+                    "No se pudo parsear la respuesta de inespecificidad")
                 st.write(unespecificResponse)
 
             st.markdown(f"### Rubros")
@@ -137,10 +139,9 @@ else:
                 if is_json(rubrosResponse):
                     st.json(rubrosResponse)
                 else:
-                    warnings.warn("No se pudo parsear la respuesta de los rubros")
+                    warnings.warn(
+                        "No se pudo parsear la respuesta de los rubros")
                     st.write(rubrosResponse)
-
-                
 
         if len(rubros) == 0:
             with st.spinner("Extrayendo razones de inespecificidad..."):
