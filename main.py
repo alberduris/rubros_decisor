@@ -13,7 +13,18 @@ import os
 from openai.embeddings_utils import get_embedding
 import openai
 import json
+import warnings
 from utils import detect_entities, similarity_search_threshold, unspecificity_detector, rubro_decisor, unspecificity_explainer
+
+def is_json(myjson):
+    # If myJson is a dict return true
+    if isinstance(myjson, dict):
+        return True
+    try:
+        json.loads(myjson)
+    except ValueError as e:
+        return False
+    return True
 
 
 st.sidebar.header('API Key Configuration')
@@ -82,14 +93,17 @@ else:
                     client_text, rubros, model)
 
             st.markdown("### Inespecificidad")
-            try:
+            # If unespecificResponse is JSON object
+            if is_json(unespecificResponse):
                 st.json(unespecificResponse)
-            except:
+            else:
+                warnings.warn("No se pudo parsear la respuesta de inespecificidad")
                 st.write(unespecificResponse)
 
             st.markdown(f"### Rubros")
             with st.spinner("Evaluando rubros..."):
                 rubrosResponse = rubro_decisor(client_text, rubros, model)
+                rubrosResponse = "{ asdaa, 'asdas: asdasd .112}"
 
 
             # If rubrosResponse is JSON object
@@ -121,18 +135,22 @@ else:
                             st.warning(rubro["razonamiento"].replace(
                                 "TextoCliente", "texto del cliente"))
             else:
-                try:
-                    print(rubrosResponse)
+                # Try to print JSON object
+                if is_json(rubrosResponse):
                     st.json(rubrosResponse)
-                except:
+                else:
+                    warnings.warn("No se pudo parsear la respuesta de los rubros")
                     st.write(rubrosResponse)
+
+                
 
         if len(rubros) == 0:
             with st.spinner("Extrayendo razones de inespecificidad..."):
                 unspecificExplanation = unspecificity_explainer(
                     client_text, model)
                 st.markdown("### Inespecificidad")
-                try:
-                    st.json(unspecificExplanation)
-                except:
+                # Try to print JSON object
+                if is_json(unespecificExplanation):
+                    st.write(unspecificExplanation)
+                else:
                     st.write(unspecificExplanation)

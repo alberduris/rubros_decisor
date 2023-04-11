@@ -59,27 +59,28 @@ Fragmento: En caso de que la respuesta sea "Sí", tendrás que identificar qué 
 
 Justificación: En caso de que la respuesta sea "Sí", también tendrás que escribir una breve justificación según tu criterio: texto libre.
 
-La respuesta será SIEMPRE un string en formato JSON con la siguiente estructura:
+La respuesta será SIEMPRE y TAN SOLO un JSON con el siguiente SCHEMA:
 
 SCHEMA:
-{inespecifico: "Sí" / "No" / "Quizás",
-tipo: "<tipo>",
-fragmento: "<fragmento de texto cliente>",
-justificacion: "<tu justificación>"}
+{"inespecifico": "Sí" / "No" / "Quizás",
+"tipo": "<tipo>",
+"fragmento": "<fragmento de texto cliente>",
+"justificacion": "<tu justificación>"}
 
 EJEMPLO: 
 
-{inespecifico: "Sí",
-tipo: "No se especifica el rubro",
-fragmento: "Venta de productos de limpieza",
-justificacion: "No se especifica el rubro al cual se dedica la marca"}
+{"inespecifico": "Sí",
+"tipo": "No se especifica el rubro",
+"fragmento": "Venta de productos de limpieza",
+"justificacion": "No se especifica el rubro al cual se dedica la marca"}
 
-{inespecifico: "No",
-tipo: "",
-fragmento: "",
-justificacion: ""}
+{"inespecifico": "No",
+"tipo": "",
+"fragmento": "",
+"justificacion": ""}
 
-La respuesta será SIEMPRE en formato JSON válido siguendo SCHEMA.
+La respuesta será SIEMPRE en formato JSON VÁLIDO siguendo SCHEMA. No escribas nada más.
+Tarea: Lee el texto, determina si es inespecífico y genera un string en formato JSON válido siguiendo el SCHEMA.
 """
 
     user_prompt = f"""TextoCliente: "{text}"
