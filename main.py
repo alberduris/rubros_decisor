@@ -28,10 +28,20 @@ def is_json(myjson):
     return True
 
 
-st.sidebar.header('API Key Configuration')
 with st.sidebar:
+    st.header('API Key Configuration')
     api_key = st.text_input('OpenAI API key')
     model = st.selectbox('Model', ['gpt-3.5-turbo', 'gpt-4'])
+
+    st.header('Búsqueda semántica')
+    ss_type = st.selectbox('Selecciona la lista de rubros a utilizar',
+                           ['Automático', 'Lista curada', 'Lista completa'])
+    if ss_type == 'Automático':
+        st.success(
+            'Se emplea la lista curada de rubros por defecto y la lista completa como fallback en caso de no encontrar coincidencias')
+    else:
+        st.warning(
+            f'Se empleará únicamente la lista seleccionada: ({ss_type}).')
 
 
 st.title('Parte 1')
@@ -57,21 +67,29 @@ else:
         st.markdown("### Extracción de entidades y búsqueda semántica")
         with st.spinner('Detectando entidades y extrayendo rubros relacionados...'):
             entities = detect_entities(client_text, model)
+
             rubros = pd.Series(dtype='object')
             # Check if entities is a list
             if not isinstance(entities, list) or len(entities) == 0:
                 entities = [client_text]
-            for ent in entities:
-                rubros = pd.concat([rubros, similarity_search_threshold(
-                    db['curated'], ent, threshold=0.3, max=10)['page_content']])
-            if rubros.empty:
+
+            # Semantic search for rubros
+            if ss_type == 'Lista curada' or ss_type == 'Automático':
                 for ent in entities:
-                    rubros = pd.Series(similarity_search_threshold(
-                        db['all'], ent, threshold=0.3, max=10)['page_content'])
+                    rubros = pd.concat([rubros, similarity_search_threshold(
+                        db['curated'], ent, threshold=0.3, max=10)['page_content']])
+                if ss_type == 'Automático' and rubros.empty:
+                    for ent in entities:
+                        rubros = pd.Series(similarity_search_threshold(
+                            db['all'], ent, threshold=0.3, max=10)['page_content'])
+            elif ss_type == 'Lista completa':
+                for ent in entities:
+                    rubros = pd.concat([rubros, similarity_search_threshold(
+                        db['all'], ent, threshold=0.3, max=10)['page_content']])
 
             # Remove duplicates, sort rubros by score and get first 10 as list
             rubros = rubros.drop_duplicates().sort_values(
-                ascending=False).head(10).tolist()
+                ascending=False).head(10 if len(entities) <= 10 else len(entities)).tolist()
 
         col1, col2 = st.columns(2)
         nl = '\n- '
