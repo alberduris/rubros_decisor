@@ -43,6 +43,9 @@ with st.sidebar:
         st.warning(
             f'Se empleará únicamente la lista seleccionada: ({ss_type}).')
 
+    # Slider for selecting the threshold between [0.1, 0.7]
+    threshold = st.slider('Umbral de similaridad', 0.1, 0.7, 0.3, 0.01)
+
 
 st.title('Parte 1')
 st.header('Detector de inespecificidades y rubros')
@@ -56,7 +59,6 @@ else:
     db = {}
     for set in ['all', 'curated']:
         # Load the FAISS DB
-        pass
         db[set] = FAISS.load_local(
             f"indexes/{set}_rubros_index", OpenAIEmbeddings(openai_api_key=openai.api_key))
 
@@ -102,11 +104,15 @@ else:
             # Check if rubros is empty
             st.markdown(f"**Los posibles rublos relacionados son:**")
             if len(rubros) == 0:
-                st.warning("No se encontraron rubros relacionados")
+                st.warning("No se encontraron rubros relacionados. Puedes probar a aumentar el umbral de similaridad.")
             else:
                 with st.expander("Ver rubros"):
-                    st.write(f"{nl}{nl.join(rubros)}\n")
-                    st.write("\n")
+                    # Rename columns of searched_rubros to "rubro" and "similaridad"
+                    st.table(searched_rubros.rename(inplace=False,
+                                                    columns={"page_content": "rubro", "score": "similaridad"}))
+                    # st.write(f"{nl}{nl.join(rubros)}\n")
+                    # st.write("\n")
+
         if len(rubros) > 0:
             with st.spinner('Detectando inespecificidades...'):
                 unespecificResponse = unspecificity_detector(
@@ -168,7 +174,7 @@ else:
                     client_text, model)
                 st.markdown("### Inespecificidad")
                 # Try to print JSON object
-                if is_json(unespecificExplanation):
+                if is_json(unspecificExplanation):
                     st.write(unspecificExplanation)
                 else:
                     st.write(unspecificExplanation)
