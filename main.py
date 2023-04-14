@@ -116,14 +116,12 @@ else:
             # Check if rubros is empty
             st.markdown(f"**Los posibles rublos relacionados son:**")
             if len(rubros) == 0:
-                st.warning("No se encontraron rubros relacionados. Puedes probar a aumentar el umbral de similaridad.")
+                st.warning(
+                    "No se encontraron rubros relacionados. Puedes probar a aumentar el umbral de similaridad.")
             else:
                 with st.expander("Ver rubros"):
                     # Rename columns of searched_rubros to "rubro" and "similaridad"
-                    st.table(searched_rubros.rename(inplace=False,
-                                                    columns={"page_content": "rubro", "score": "similaridad"}))
-                    # st.write(f"{nl}{nl.join(rubros)}\n")
-                    # st.write("\n")
+                    st.table(searched_rubros.head(10 if len(entities) <= 10 else len(entities)).rename(inplace=False, columns={"page_content": "rubro", "score": "similaridad"}).assign(similaridad=lambda x: x['similaridad'].apply(lambda y: f"{y:.2f}")).reset_index(drop=True))
 
         if len(rubros) > 0:
             with st.spinner('Detectando inespecificidades...'):
