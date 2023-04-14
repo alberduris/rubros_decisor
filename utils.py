@@ -1,23 +1,23 @@
 import openai
 import json
 import pandas as pd
+import streamlit as st
 
 ## OTHER FUNCTIONS ##
 
 
-def similarity_search_threshold(db, query, threshold, max):
+def similarity_search_threshold(db, query="", threshold=0.3, max=10):
     # [(Document(page_content='[Decoración] Velas', metadata={}), 0.21071842), ... ]
     ssws = db.similarity_search_with_score(query=query, k=max)
+
     # Create a pandas df from ssws
-    df = pd.DataFrame([(doc.page_content, score)
-                      for doc, score in ssws], columns=['page_content', 'score'])
+    df = pd.DataFrame([(doc.page_content, score) for doc, score in ssws], columns=[
+        'page_content', 'score'], index=None)
+
     # Filter by threshold: Get all the rows where the score is less than the threshold and if it's none then return the five first rows
     df_filtered = df[df['score'] < threshold]
-    if len(df_filtered) < 5:
-        return df.head(5)
-    else:
-        return df_filtered
 
+    return df_filtered
 
 ## PROMPTS ##
 

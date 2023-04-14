@@ -69,29 +69,41 @@ else:
         st.markdown("### Extracción de entidades y búsqueda semántica")
         with st.spinner('Detectando entidades y extrayendo rubros relacionados...'):
             entities = detect_entities(client_text, model)
+            # Add the client text to entities in the first position of the list
 
-            rubros = pd.Series(dtype='object')
+            searched_rubros = pd.DataFrame()
             # Check if entities is a list
             if not isinstance(entities, list) or len(entities) == 0:
                 entities = [client_text]
+            else:
+                entities.insert(0, client_text)
 
             # Semantic search for rubros
             if ss_type == 'Lista curada' or ss_type == 'Automático':
+                if ss_type == 'Lista curada':
+                    st.warning(
+                        'Se emplea únicamente la lista curada de rubros')
                 for ent in entities:
-                    rubros = pd.concat([rubros, similarity_search_threshold(
-                        db['curated'], ent, threshold=0.3, max=10)['page_content']])
-                if ss_type == 'Automático' and rubros.empty:
+                    searched_rubros = pd.concat([searched_rubros, similarity_search_threshold(
+                        db['curated'], ent, threshold=threshold, max=10)])
+                if ss_type == 'Automático' and len(searched_rubros) < 5:
+                    st.warning(
+                        f'Se encontraron {len(searched_rubros)} rubros relacionados en la lista curada, empleando la lista completa de rubros')
                     for ent in entities:
-                        rubros = pd.Series(similarity_search_threshold(
-                            db['all'], ent, threshold=0.3, max=10)['page_content'])
+                        searched_rubros = pd.concat([searched_rubros, similarity_search_threshold(
+                            db['all'], ent, threshold=threshold, max=10)])
             elif ss_type == 'Lista completa':
+                st.warning(
+                    'Se emplea únicamente la lista completa de rubros')
                 for ent in entities:
-                    rubros = pd.concat([rubros, similarity_search_threshold(
-                        db['all'], ent, threshold=0.3, max=10)['page_content']])
+                    searched_rubros = pd.concat([searched_rubros, similarity_search_threshold(
+                        db['all'], ent, threshold=threshold, max=10)])
 
-            # Remove duplicates, sort rubros by score and get first 10 as list
-            rubros = rubros.drop_duplicates().sort_values(
-                ascending=False).head(10 if len(entities) <= 10 else len(entities)).tolist()
+            # Sort rubros by score, remove duplicates keeping the one with the lowest score, and get first 10 or entities length as list
+            searched_rubros = searched_rubros.drop_duplicates(
+                subset="page_content", inplace=False).sort_values(by='score')
+            rubros = searched_rubros.head(10 if len(entities) <= 10 else len(entities))[
+                "page_content"].tolist()
 
         col1, col2 = st.columns(2)
         nl = '\n- '
