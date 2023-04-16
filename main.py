@@ -66,6 +66,7 @@ else:
         'Texto del cliente:', '', placeholder='Marca de decoración hecha a mano')
 
     if st.button('Enviar'):
+        print('Texto del cliente:', client_text)
         st.markdown("### Extracción de entidades y búsqueda semántica")
         with st.spinner('Detectando entidades y extrayendo rubros relacionados...'):
             entities = detect_entities(client_text, model)
@@ -167,8 +168,7 @@ else:
                     st.markdown("**Rubros en duda**")
                     for rubro in maybe_rubros:
                         with st.expander(rubro["rubro"]):
-                            st.warning(rubro["razonamiento"].replace(
-                                "TextoCliente", "texto del cliente"))
+                            st.warning(rubro["razonamiento"])
             else:
                 # Try to print JSON object
                 if is_json(rubrosResponse):
