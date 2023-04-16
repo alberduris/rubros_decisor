@@ -99,10 +99,13 @@ else:
                 for ent in entities:
                     searched_rubros = pd.concat([searched_rubros, similarity_search_threshold(
                         db['all'], ent, threshold=threshold, max=10)])
+                    # st.write(ent)
+                    # st.table(searched_rubros.sort_values(by='score'))
 
             # Sort rubros by score, remove duplicates keeping the one with the lowest score, and get first 10 or entities length as list
+            searched_rubros = searched_rubros.sort_values(by='score')
             searched_rubros = searched_rubros.drop_duplicates(
-                subset="page_content", inplace=False).sort_values(by='score')
+                subset='page_content', keep='first', inplace=False)
             rubros = searched_rubros.head(10 if len(entities) <= 10 else len(entities))[
                 "page_content"].tolist()
 
@@ -122,7 +125,8 @@ else:
             else:
                 with st.expander("Ver rubros"):
                     # Rename columns of searched_rubros to "rubro" and "similaridad"
-                    st.table(searched_rubros.head(10 if len(entities) <= 10 else len(entities)).rename(inplace=False, columns={"page_content": "rubro", "score": "similaridad"}).assign(similaridad=lambda x: x['similaridad'].apply(lambda y: f"{y:.2f}")).reset_index(drop=True))
+                    st.table(searched_rubros.head(10 if len(entities) <= 10 else len(entities)).rename(inplace=False, columns={
+                             "page_content": "rubro", "score": "similaridad"}).assign(similaridad=lambda x: x['similaridad'].apply(lambda y: f"{y:.2f}")).reset_index(drop=True))
 
         if len(rubros) > 0:
             with st.spinner('Detectando inespecificidades...'):
