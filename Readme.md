@@ -13,11 +13,11 @@ Documentación oficial: https://docs.streamlit.io/streamlit-community-cloud/get-
 
 ### Desplegar la aplicación
 
-1. Ve al [Dashboard](https://share.streamlit.io/), 
+1. Ve al [Dashboard](https://share.streamlit.io/)
 2. Haz click en el botón "New App" en la esquina superior derecha, 
 3. En la nueva ventana, elige tu repositorio (`usuario/rubros_decisor`), la branch (`master`) y la ruta de archivo principal (`main.py`), y haz click en "Deploy". 
 
-![deploy](imgs/Screenshot from 2023-04-18 14-11-21.png)
+![deploy](https://github.com/alberduris/rubros_decisor/blob/master/imgs/Screenshot%20from%202023-04-18%2014-11-21.png?raw=true)
 
 Tras eso, la aplicación se desplegará automáticamente y estará disponible en una URL similar a:
   * https://{{usuario}}-rubros-decisor-main-4qzfpr.streamlit.app/
