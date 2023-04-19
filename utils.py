@@ -7,7 +7,9 @@ from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field, validator
-from langchain.output_parsers import OutputFixingParser
+from langchain.output_parsers import  OutputFixingParser
+
+# TODO: Integrar el OutputParser al resto de prompts
 
 import streamlit as st
 
@@ -45,7 +47,7 @@ def parse_output(initial_response, parser, model, max_retries=3):
                 to_fix_response)  # Get the fixed response (class)
             print(f"Retrying {i+1}/{max_retries}...")
             try:
-                return fixed_response.__dict__
+                return fixed_response.dict()
             except:
                 # If still not valid JSON, keep trying looping over response
                 print("Another one bites the dust")
@@ -114,15 +116,21 @@ Justificación: En caso de que la respuesta sea "Sí", también tendrás que esc
 Tarea: Lee el texto, determina si es inespecífico y genera un string en formato JSON válido siguiendo el SCHEMA.
 """
 
+    # Instantiate the parser based on the Python class that defines the schema
     parser = PydanticOutputParser(pydantic_object=Unspecificity)
 
+
+    # Instantiate the PromptTemplate class with the system prompt (f-string) as template and the instructions from the parser as the "format_instructions" partial variable
     system_prompt = PromptTemplate(
         template=system_msg,
         input_variables=[],
         partial_variables={
             "format_instructions": parser.get_format_instructions()}
     )
+
+    # Get the actual prompt to be sent to the API by calling the format_prompt method
     system_input = system_prompt.format_prompt()
+
 
     user_prompt = PromptTemplate(
         template="TextoCliente: {text}\nPosiblesRubros: {rubros}",
