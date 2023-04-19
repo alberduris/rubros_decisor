@@ -28,6 +28,34 @@ def similarity_search_threshold(db, query, threshold, max):
         return df_filtered
 
 
+def parse_output(initial_response, parser, model, max_retries=3):
+    try:
+        return json.loads(initial_response.choices[0].message.content)
+    except:
+        print(
+            "No JSON object could be decoded, trying OutputFixingParser...")
+        # Instantiate the OutputFixingParser
+        fixing_parser = OutputFixingParser.from_llm(parser=parser, llm=ChatOpenAI(
+            openai_api_key=openai.api_key, temperature=0, model_name=model))
+
+        # Loop max_retries times while the response is not valid JSON
+        to_fix_response = initial_response
+        for i in range(max_retries):
+            fixed_response = fixing_parser.parse(
+                to_fix_response)  # Get the fixed response (class)
+            print(f"Retrying {i+1}/{max_retries}...")
+            try:
+                return fixed_response.__dict__
+            except:
+                # If still not valid JSON, keep trying looping over response
+                print("Another one bites the dust")
+                to_fix_response = fixed_response
+
+        print(
+            "No JSON object could be decoded, returning as string")
+        return initial_response.choices[0].message.content
+
+
 ## PROMPTS ##
 
 def detect_entities(text, model):
@@ -110,33 +138,7 @@ Tarea: Lee el texto, determina si es inespecífico y genera un string en formato
     ],
         temperature=0,)
 
-    # TODO: Extract to a method to parse all wannabe-JSON outputs in the same way
-    try:
-        return json.loads(initial_response.choices[0].message.content)
-    except:
-        print(
-            "unspecificity_detector > No JSON object could be decoded, trying OutputFixingParser...")
-        # Instantiate the OutputFixingParser
-        fixing_parser = OutputFixingParser.from_llm(parser=parser, llm=ChatOpenAI(
-            openai_api_key=openai.api_key, temperature=0, model_name=model))
-
-        # Loop max_retries times while the response is not valid JSON
-        to_fix_response = initial_response
-        for i in range(max_retries):
-            fixed_response = fixing_parser.parse(
-                to_fix_response)  # Get the fixed response (class)
-            print(f"Retrying {i+1}/{max_retries}...")
-            try:
-                return fixed_response.__dict__
-            except:
-                # If still not valid JSON, keep trying looping over response
-                st.write("Another one bites the dust")
-                to_fix_response = fixed_response
-
-        print(
-            "unspecificity_detector > No JSON object could be decoded, returning as string")
-
-        return initial_response.choices[0].message.content
+    return parse_output(initial_response, parser, model, max_retries)
 
 
 def rubro_decisor(text, rubros, model):
