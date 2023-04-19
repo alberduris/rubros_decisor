@@ -1,6 +1,16 @@
 import openai
 import json
 import pandas as pd
+from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+from langchain.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate
+from langchain.llms import OpenAI
+from langchain.chat_models import ChatOpenAI
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field, validator
+from langchain.output_parsers import  OutputFixingParser
+
+# TODO: Integrar el OutputParser al resto de prompts
+
 import streamlit as st
 
 ## OTHER FUNCTIONS ##
@@ -19,6 +29,35 @@ def similarity_search_threshold(db, query="", threshold=0.3, max=10):
 
     return df_filtered
 
+
+def parse_output(initial_response, parser, model, max_retries=3):
+    try:
+        return json.loads(initial_response.choices[0].message.content)
+    except:
+        print(
+            "No JSON object could be decoded, trying OutputFixingParser...")
+        # Instantiate the OutputFixingParser
+        fixing_parser = OutputFixingParser.from_llm(parser=parser, llm=ChatOpenAI(
+            openai_api_key=openai.api_key, temperature=0, model_name=model))
+
+        # Loop max_retries times while the response is not valid JSON
+        to_fix_response = initial_response
+        for i in range(max_retries):
+            fixed_response = fixing_parser.parse(
+                to_fix_response)  # Get the fixed response (class)
+            print(f"Retrying {i+1}/{max_retries}...")
+            try:
+                return fixed_response.dict()
+            except:
+                # If still not valid JSON, keep trying looping over response
+                print("Another one bites the dust")
+                to_fix_response = fixed_response
+
+        print(
+            "No JSON object could be decoded, returning as string")
+        return initial_response.choices[0].message.content
+
+
 ## PROMPTS ##
 
 def detect_entities(text, model):
@@ -34,6 +73,7 @@ SCHEMA:
 Instrucción: Si no hay ninguna entidad, devuelve una lista vacía ([]).
 
 Tarea: Lee el texto, extrae cada PRODUCTO, SERVICIO y PROFESIÓN y escribe una lista en formato JSON válido siguiendo el SCHEMA."""
+
     # Call to OpenAI completion endpoint with GPT and system_prompt
     response = openai.ChatCompletion.create(model=model, messages=[
         {"role": "system", "content": system_prompt},
@@ -48,8 +88,16 @@ Tarea: Lee el texto, extrae cada PRODUCTO, SERVICIO y PROFESIÓN y escribe una l
         return response.choices[0].message.content
 
 
-def unspecificity_detector(text, rubros, model):
-    system_prompt = """Eres un abogado experto en el registro de marcas comerciales. Las marcas se clasifican en base al rubro al cual se dedican. 
+class Unspecificity(BaseModel):
+    inespecifico: str = Field(
+        description="Las posibles respuesta, siendo 'Sí', 'No' o 'Quizás'")
+    tipo: str = Field(description="El tipo de inespecificidad")
+    fragmento: str = Field(description="El fragmento de TextoCliente")
+    justificacion: str = Field(description="La justificación")
+
+
+def unspecificity_detector(text, rubros, model, max_retries=3):
+    system_msg = """Eres un abogado experto en el registro de marcas comerciales. Las marcas se clasifican en base al rubro al cual se dedican. 
 
 A partir de ahora debes actuar como un clasificador de texto multi-clase. 
 
@@ -63,45 +111,42 @@ Fragmento: En caso de que la respuesta sea "Sí", tendrás que identificar qué 
 
 Justificación: En caso de que la respuesta sea "Sí", también tendrás que escribir una breve justificación según tu criterio: texto libre.
 
-La respuesta será SIEMPRE y TAN SOLO un JSON con el siguiente SCHEMA:
+{format_instructions}
 
-SCHEMA:
-{"inespecifico": "Sí" / "No" / "Quizás",
-"tipo": "<tipo>",
-"fragmento": "<fragmento de texto cliente>",
-"justificacion": "<tu justificación>"}
-
-EJEMPLO: 
-
-{"inespecifico": "Sí",
-"tipo": "No se especifica el rubro",
-"fragmento": "Venta de productos de limpieza",
-"justificacion": "No se especifica el rubro al cual se dedica la marca"}
-
-{"inespecifico": "No",
-"tipo": "",
-"fragmento": "",
-"justificacion": ""}
-
-La respuesta será SIEMPRE en formato JSON VÁLIDO siguendo SCHEMA. No escribas nada más.
 Tarea: Lee el texto, determina si es inespecífico y genera un string en formato JSON válido siguiendo el SCHEMA.
 """
 
-    user_prompt = f"""TextoCliente: "{text}"
-PosiblesRubros: {rubros}"""
+    # Instantiate the parser based on the Python class that defines the schema
+    parser = PydanticOutputParser(pydantic_object=Unspecificity)
+
+
+    # Instantiate the PromptTemplate class with the system prompt (f-string) as template and the instructions from the parser as the "format_instructions" partial variable
+    system_prompt = PromptTemplate(
+        template=system_msg,
+        input_variables=[],
+        partial_variables={
+            "format_instructions": parser.get_format_instructions()}
+    )
+
+    # Get the actual prompt to be sent to the API by calling the format_prompt method
+    system_input = system_prompt.format_prompt()
+
+
+    user_prompt = PromptTemplate(
+        template="TextoCliente: {text}\nPosiblesRubros: {rubros}",
+        input_variables=["text", "rubros"],
+    )
+
+    user_input = user_prompt.format_prompt(text=text, rubros=rubros)
 
     # Call to OpenAI completion endpoint with GPT and system_prompt
-    response = openai.ChatCompletion.create(model=model, messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt}
+    initial_response = openai.ChatCompletion.create(model=model, messages=[
+        {"role": "system", "content": system_input.to_string()},
+        {"role": "user", "content": user_input.to_string()}
     ],
         temperature=0,)
-    try:
-        return json.loads(response.choices[0].message.content)
-    except:
-        print(
-            "unspecificity_detector > No JSON object could be decoded, returning as string")
-        return response.choices[0].message.content
+
+    return parse_output(initial_response, parser, model, max_retries)
 
 
 def rubro_decisor(text, rubros, model):
